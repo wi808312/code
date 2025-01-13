@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+#Author: mike4192 https://github.com/mike4192/spotMicro
+#Modified by: lnotspotl
+
+import numpy as np
+
+class GaitController(object):
+    def __init__(self, stance_time, swing_time, time_step, contact_phases, default_stance):
+        self.stance_time = stance_time #스탠스한 시간
+        self.swing_time = swing_time #스윙한 시간
+        self.time_step = time_step #단계 당 시간? 잘 모르겠음
+        self.contact_phases = contact_phases #무슨 페이즈인지
+        self.def_stance = default_stance #초기 스탠스 설정
+
+    @property
+    def default_stance(self):
+        return self.def_stance
+
+    @property
+    def stance_ticks(self): #스탠스의 틱
+        return int(self.stance_time / self.time_step)
+
+    @property 
+    def swing_ticks(self): #스윙의 틱
+        return int(self.swing_time / self.time_step)
+
+    @property
+    def phase_ticks(self): #페이즈별 시간 나열
+        temp = []
+        for i in range(len(self.contact_phases[0])):
+            if 0 in self.contact_phases[:,i]:
+                temp.append(self.swing_ticks) #temp에 self.swing_ticks의 값을 추가로 저장함
+            else:
+                temp.append(self.stance_ticks) #temp에 self.stance_ticks의 값을 추가로 저장함
+        return temp
+
+    @property 
+    def phase_length(self): #페이즈의 시간 총합
+        return sum(self.phase_ticks)
+
+    def phase_index(self, ticks): 
+        """ Calculate, which part of the gait cycle the robot should be in """
+        phase_time = ticks % self.phase_length #틱에서 페이즈의 시간 나눈 나머지
+        phase_sum = 0 #phase_sum을 0으로 정의의
+        phase_ticks = self.phase_ticks #페이즈별 시간을 불러옴
+        for i in range(len(self.contact_phases[0])):
+            phase_sum += phase_ticks[i] #페이즈별 시간을 순차적으로 합함
+            if phase_time < phase_sum:
+                return i #지금 페이즈를 return함
+        assert False
+
+    def subphase_ticks(self, ticks): #변수의 값은 phase_index 동일한데 지금 페이즈에서 몇 틱이 지났는지를 구함
+        """ Calculate the number of ticks (timesteps)
+            since the begining of the current phase """
+        phase_time = ticks % self.phase_length
+        phase_sum = 0
+        phase_ticks = self.phase_ticks
+        for i in range(len(self.contact_phases[0])):
+            phase_sum += phase_ticks[i]
+            if phase_time < phase_sum:
+                subphase_ticks = phase_time - phase_sum + phase_ticks[i]
+                return subphase_ticks
+        assert False
+    
+    def contacts(self, ticks): #어떤 다리가 연결될 필요가 있는지 계산
+        """ Calculate which feet should be in contact """
+        return self.contact_phases[:, self.phase_index(ticks)]
+
